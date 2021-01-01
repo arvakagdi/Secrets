@@ -35,7 +35,8 @@ const userSchema = new mongoose.Schema({
     email : String,
     password : String,
     googleId: String,
-    facebookId: String
+    facebookId: String,
+    secret: String
 })
 
 userSchema.plugin(passportLocalMongoose);  // added plugin to schema 
@@ -65,7 +66,6 @@ passport.use(new GoogleStrategy({
     userProfileURL:"https://www.googleapis.com/oauth2/v3/userinfo"   // to be used for google + deprecation failure
   },
   function(accessToken, refreshToken, profile, cb) {
-      console.log(profile);
       User.findOrCreate({ googleId: profile.id }, function (err, user) {  // we can inplement finOne or createOne available in mongoose, but here we used finOrCreare package available
       return cb(err, user);
     });
@@ -123,8 +123,20 @@ app.get("/register", function(req,res) {
 });
 
 app.get("/secrets", function(req,res){
+    User.find({"secret":{$ne: null}}, function(err,foundUsers){
+        if(err){
+            console.log(err);
+        }else{
+            if(foundUsers){
+                res.render("secrets", {usersWithSecrets: foundUsers});
+            }
+        }
+    });
+});
+
+app.get("/submit", function(req,res){
     if (req.isAuthenticated()){
-        res.render("secrets");
+        res.render("submit");
     } else{
         res.redirect("/login");
     }
@@ -170,7 +182,22 @@ app.post("/login", function(req,res){
     });
 });
 
+app.post("/submit", function(req,res){   // to get the secret posted by user
+    const submittedSecret = req.body.secret;  // secret submited by user
 
+    User.findById(req.user.id, function(err, foundUser){
+        if(err){
+            console.log(err);
+        }else{
+            if(foundUser){
+                foundUser.secret = submittedSecret;
+                foundUser.save(function(){
+                    res.redirect("/secrets");
+                });
+            }
+        }
+    });
+});
 
 app.listen(3000, function(){
     console.log("Server started at port 3000.");
